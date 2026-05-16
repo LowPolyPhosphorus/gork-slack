@@ -1,5 +1,7 @@
+import { splitArgs } from '~/utils/text';
 import { execute as banExecute, name as banName } from './ban';
-import { execute as leaveExecute, name as leaveName } from './leave';
+import { execute as helpExecute, name as helpName } from './help';
+import { execute as modeExecute, name as modeName } from './mode';
 import { execute as reportsExecute, name as reportsName } from './reports';
 import { execute as unbanExecute, name as unbanName } from './unban';
 
@@ -7,10 +9,9 @@ const subcommands = [
   { name: banName, execute: banExecute },
   { name: unbanName, execute: unbanExecute },
   { name: reportsName, execute: reportsExecute },
-  { name: leaveName, execute: leaveExecute },
+  { name: modeName, execute: modeExecute },
+  { name: helpName, execute: helpExecute },
 ] as const;
-
-const WHITESPACE_PATTERN = /\s+/;
 
 // Regex to match /gork, /gork-dev, /gork-st, /gork-anything, etc.
 export const GORK_COMMAND_PATTERN = /^\/gork(?:-\w+)?$/;
@@ -19,12 +20,11 @@ function parseSubcommand(text: string): {
   subcommand: string | null;
   args: string;
 } {
-  const trimmed = text.trim();
-  if (!trimmed) {
+  const parts = splitArgs(text);
+  if (!parts.length) {
     return { subcommand: null, args: '' };
   }
 
-  const parts = trimmed.split(WHITESPACE_PATTERN);
   const subcommand = parts[0]?.toLowerCase() ?? null;
   const args = parts.slice(1).join(' ');
 
@@ -38,11 +38,10 @@ async function handleGorkCommand(
   const { subcommand, args } = parseSubcommand(command.text);
 
   if (!subcommand) {
-    await context.ack();
-    await respond({
-      text: `Available subcommands: ${subcommands.map((s) => s.name).join(', ')}\nUsage: \`${command.command} <subcommand> [args]\``,
-      response_type: 'ephemeral',
-    });
+    const helpHandler = subcommands.find((s) => s.name === 'help');
+    if (helpHandler) {
+      await helpHandler.execute(context);
+    }
     return;
   }
 
@@ -51,13 +50,12 @@ async function handleGorkCommand(
   if (!handler) {
     await context.ack();
     await respond({
-      text: `Unknown subcommand: \`${subcommand}\`\nAvailable subcommands: ${subcommands.map((s) => s.name).join(', ')}`,
+      text: `Unknown subcommand: \`${subcommand}\`\nRun \`${command.command} help\` to see all available commands.`,
       response_type: 'ephemeral',
     });
     return;
   }
 
-  // Pass the remaining args in the text field for subcommands that need it
   const modifiedContext = {
     ...context,
     command: {

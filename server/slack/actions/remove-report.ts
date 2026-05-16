@@ -5,9 +5,9 @@ import type {
   SlackActionMiddlewareArgs,
 } from '@slack/bolt';
 import logger from '~/lib/logger';
+import { isAdmin } from '~/lib/permissions';
 import {
   getUserReports,
-  isAdmin,
   isUserBanned,
   removeReport,
   userReportBlocks,
@@ -28,7 +28,7 @@ export async function execute({
 }: SlackActionMiddlewareArgs<BlockAction<ButtonAction>> & AllMiddlewareArgs) {
   await ack();
 
-  if (!isAdmin(body.user.id)) {
+  if (!(await isAdmin(client, body.user.id))) {
     return;
   }
 

@@ -2,7 +2,7 @@ import type {
   AllMiddlewareArgs,
   SlackCommandMiddlewareArgs,
 } from '@slack/bolt';
-import { isAdmin } from '~/lib/reports';
+import { isAdmin } from '~/lib/permissions';
 import { respondWithPermissionError } from '~/lib/slack/errors';
 
 export const name = 'reports';
@@ -16,7 +16,7 @@ export async function execute(
 
   await ack();
 
-  if (!isAdmin(adminId)) {
+  if (!(await isAdmin(client, adminId))) {
     await respondWithPermissionError(context);
     return;
   }
@@ -26,6 +26,7 @@ export async function execute(
     view: {
       type: 'modal',
       callback_id: 'view_reports_modal',
+      private_metadata: JSON.stringify({ openedBy: adminId }),
       title: {
         type: 'plain_text',
         text: 'View Reports',

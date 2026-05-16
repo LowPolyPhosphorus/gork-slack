@@ -17,11 +17,18 @@ export const memories = {
   maxMemories: 4,
 };
 
-export const leaveChannelBlocklist = [
+export const restrictedChannels = [
   { id: 'C09P6S7H725', name: 'gork' },
   { id: 'C09PNAM0M0Q', name: 'gork-spam' },
   { id: 'C0AEV1PCX1V', name: 'gork-logs' },
   { id: 'C0A9ATPB2KF', name: 'gork-reports' },
+];
+
+export const blockedChannels = [
+  { id: 'CNMU9L92Q', name: 'confessions' },
+  { id: 'C0188CY57PZ', name: 'meta' },
+  { id: 'C0C78SG9L', name: 'hq' },
+  { id: 'C0AUZ1LAMH6', name: 'macondo' },
 ];
 
 export const moderation = {

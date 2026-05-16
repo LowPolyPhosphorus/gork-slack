@@ -5,12 +5,8 @@ import type {
   SlackActionMiddlewareArgs,
 } from '@slack/bolt';
 import logger from '~/lib/logger';
-import {
-  getUserReports,
-  isAdmin,
-  isUserBanned,
-  userReportBlocks,
-} from '~/lib/reports';
+import { isAdmin } from '~/lib/permissions';
+import { getUserReports, isUserBanned, userReportBlocks } from '~/lib/reports';
 import { executeBan } from '~/lib/slack/bans';
 
 export const name = 'ban_user';
@@ -23,7 +19,7 @@ export async function execute(
 
   await ack();
 
-  if (!isAdmin(body.user.id)) {
+  if (!(await isAdmin(client, body.user.id))) {
     return;
   }
 

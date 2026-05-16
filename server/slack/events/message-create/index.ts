@@ -1,142 +1,38 @@
-import type { AllMiddlewareArgs, SlackEventMiddlewareArgs } from '@slack/bolt';
-import { keywords, messageThreshold } from '~/config';
-import { env } from '~/env';
-import { isUserAllowed } from '~/lib/allowed-users';
+import { blockedChannels, keywords } from '~/config';
 import {
   clearSilenced,
+  getEffectiveMode,
   isSilenced,
+  keys,
   ratelimit,
-  redisKeys,
-  setSilenced,
 } from '~/lib/kv';
 import logger from '~/lib/logger';
-import { saveChatMemory } from '~/lib/memory';
-import { clearQueue, getQueue } from '~/lib/queue';
-import { isUserBanned } from '~/lib/reports';
-import type { SlackMessageContext } from '~/types';
-import { buildChatContext } from '~/utils/context';
-import { logReply } from '~/utils/log';
-import {
-  checkMessageQuota,
-  handleMessageCount,
-  resetMessageCount,
-} from '~/utils/message-rate-limiter';
+import { getQueue } from '~/lib/queue';
+import { handleInlineCommand } from '~/utils/inline-commands';
 import { shouldUse } from '~/utils/messages';
-import { getTrigger } from '~/utils/triggers';
-import { assessRelevance } from './utils/relevance';
-import { generateResponse } from './utils/respond';
+import { getTrigger, type Trigger } from '~/utils/triggers';
+import { handleRelevance } from './handlers/relevance';
+import { handleTriggered } from './handlers/triggered';
+import {
+  getContextId,
+  isProcessableMessage,
+  type MessageEventArgs,
+} from './utils/message';
 
 export const name = 'message';
 
-const blockedChannels = new Set(env.BLOCKED_CHANNELS ?? []);
-
-type MessageEventArgs = SlackEventMiddlewareArgs<'message'> & AllMiddlewareArgs;
-
 async function canReply(ctxId: string): Promise<boolean> {
-  const { success } = await ratelimit(redisKeys.channelCount(ctxId));
+  const { success } = await ratelimit(keys.channelCount(ctxId));
   if (!success) {
     logger.info(`[${ctxId}] Rate limit hit. Skipping reply.`);
   }
   return success;
 }
 
-async function onSuccess(context: SlackMessageContext) {
-  await saveChatMemory(context, 5);
-}
-
-function isProcessableMessage(
-  args: MessageEventArgs
-): SlackMessageContext | null {
-  const { event, context, client, body } = args;
-
-  // has to be done again for type things
-  if (
-    event.subtype &&
-    event.subtype !== 'thread_broadcast' &&
-    event.subtype !== 'file_share'
-  ) {
-    return null;
-  }
-
-  if ('bot_id' in event && event.bot_id) {
-    return null;
-  }
-
-  if (context.botUserId && event.user === context.botUserId) {
-    return null;
-  }
-
-  if (!('text' in event)) {
-    return null;
-  }
-
-  return {
-    event: event as SlackMessageContext['event'],
-    client,
-    botUserId: context.botUserId,
-    teamId:
-      context.teamId ??
-      (typeof body === 'object' && body
-        ? (body as { team_id?: string }).team_id
-        : undefined),
-  } satisfies SlackMessageContext;
-}
-
-async function getAuthorName(ctx: SlackMessageContext): Promise<string> {
-  const userId = (ctx.event as { user?: string }).user;
-  if (!userId) {
-    return 'unknown';
-  }
-  try {
-    const info = await ctx.client.users.info({ user: userId });
-    return (
-      info.user?.profile?.display_name ||
-      info.user?.real_name ||
-      info.user?.name ||
-      userId
-    );
-  } catch (error) {
-    logger.warn({ error, userId }, 'Failed to fetch user info for logging');
-    return userId;
-  }
-}
-
-function getContextId(ctx: SlackMessageContext): string {
-  const channel = ctx.event.channel ?? 'unknown-channel';
-  const channelType = ctx.event.channel_type;
-  const userId = (ctx.event as { user?: string }).user;
-  const threadTs = (ctx.event as { thread_ts?: string }).thread_ts;
-
-  if (channelType === 'im' && userId) {
-    return `dm:${userId}`;
-  }
-  if (threadTs) {
-    return `${channel}:${threadTs}`;
-  }
-  return channel;
-}
-
-async function handleTriggerInBlockedChannel(
-  ctx: SlackMessageContext,
-  triggerType: string
+async function handleMessage(
+  args: MessageEventArgs,
+  trigger: Trigger
 ): Promise<void> {
-  if (triggerType !== 'ping' && triggerType !== 'dm') {
-    return;
-  }
-  const channelId = (ctx.event as { channel?: string }).channel;
-  const threadTs = (ctx.event as { thread_ts?: string }).thread_ts;
-  const messageTs = (ctx.event as { ts?: string }).ts;
-  if (!channelId) {
-    return;
-  }
-  await ctx.client.chat.postMessage({
-    channel: channelId,
-    thread_ts: threadTs ?? messageTs,
-    text: "sorry i'm not allowed to respond in this channel",
-  });
-}
-
-async function handleMessage(args: MessageEventArgs) {
   if (
     args.event.subtype &&
     args.event.subtype !== 'thread_broadcast' &&
@@ -155,25 +51,17 @@ async function handleMessage(args: MessageEventArgs) {
   }
 
   const ctxId = getContextId(messageContext);
-  if (!(await canReply(ctxId))) {
+
+  if (blockedChannels.some((c) => c.id === args.event.channel)) {
+    if (trigger.type === 'ping' || trigger.type === 'dm') {
+      await args.client.chat.postMessage({
+        channel: args.event.channel,
+        thread_ts: args.event.thread_ts ?? args.event.ts,
+        text: "can't talk here, find me in another channel",
+      });
+    }
     return;
   }
-
-  const trigger = await getTrigger(
-    messageContext,
-    keywords,
-    messageContext.botUserId
-  );
-
-  if (blockedChannels.has(args.event.channel)) {
-    await handleTriggerInBlockedChannel(messageContext, trigger.type ?? '');
-    return;
-  }
-
-  const authorName = await getAuthorName(messageContext);
-  const content = (messageContext.event as { text?: string }).text ?? '';
-
-  const { messages, hints, memories } = await buildChatContext(messageContext);
 
   const silenced = await isSilenced(ctxId);
   if (silenced) {
@@ -186,120 +74,25 @@ async function handleMessage(args: MessageEventArgs) {
     }
   }
 
-  if (trigger.type) {
-    if (!isUserAllowed(args.event.user)) {
-      if (trigger.type === 'keyword') {
-        return;
-      }
-      await args.client.chat.postMessage({
-        channel: args.event.channel,
-        thread_ts: args.event.thread_ts || args.event.ts,
-        markdown_text: `sorry bro <@${args.event.user}> you gotta be in <#${env.OPT_IN_CHANNEL}> to talk to me alr? i'm exclusive yk`,
-      });
-      return;
-    }
+  const channelMode = await getEffectiveMode({
+    workspaceId: messageContext.teamId,
+    channelId: args.event.channel,
+  });
 
-    const userId = args.event.user;
-    if (userId && (await isUserBanned(userId))) {
-      if (trigger.type === 'ping' || trigger.type === 'dm') {
-        await args.client.chat.postMessage({
-          channel: args.event.channel,
-          text: "nah bro you're banned lol. hit up staff if you think this is a mistake or whatever",
-          thread_ts: args.event.thread_ts || args.event.ts,
-        });
-      }
-      logger.info({ userId }, 'Refused to respond to banned user');
-      return;
-    }
+  const routeToTrigger =
+    trigger.type != null &&
+    !(trigger.type === 'keyword' && channelMode === 'relevance');
 
-    if (
-      (trigger.type === 'ping' || trigger.type === 'dm') &&
-      env.AUTO_ADD_CHANNEL &&
-      args.context.userId
-    ) {
-      try {
-        await args.client.conversations.invite({
-          channel: env.AUTO_ADD_CHANNEL,
-          users: args.context.userId,
-        });
-        logger.info(
-          `Added ${args.context.userId} to channel ${env.AUTO_ADD_CHANNEL}`
-        );
-      } catch (error) {
-        logger.error({ error }, 'Failed to add user to channel');
-      }
-    }
-
-    await resetMessageCount(ctxId);
-
-    logger.info(
-      { message: `${authorName}: ${content}` },
-      `[${ctxId}] Triggered by ${trigger.type}`
-    );
-
-    const result = await generateResponse(
+  if (routeToTrigger && trigger.type != null) {
+    await handleTriggered({
       messageContext,
-      messages,
-      hints,
-      memories
-    );
-
-    logReply(ctxId, authorName, result, 'trigger');
-
-    if (result.success && result.toolCalls) {
-      await onSuccess(messageContext);
-    }
+      channelMode,
+      triggerType: trigger.type,
+    });
     return;
   }
 
-  if (!isUserAllowed(args.event.user)) {
-    return;
-  }
-
-  if (args.event.user && (await isUserBanned(args.event.user))) {
-    return;
-  }
-
-  const { count: idleCount, hasQuota } = await checkMessageQuota(ctxId);
-
-  if (!hasQuota) {
-    logger.debug(
-      `[${ctxId}] Quota exhausted (${idleCount}/${messageThreshold})`
-    );
-    return;
-  }
-
-  const { probability, reason } = await assessRelevance(
-    messageContext,
-    messages,
-    hints,
-    memories
-  );
-  logger.info(
-    { reason, probability, message: `${authorName}: ${content}` },
-    `[${ctxId}] Relevance check`
-  );
-
-  const willReply = probability > 0.5;
-  await handleMessageCount(ctxId, willReply);
-
-  if (!willReply) {
-    logger.debug(`[${ctxId}] Low relevance — ignoring`);
-    return;
-  }
-
-  logger.info(`[${ctxId}] Replying (relevance: ${probability.toFixed(2)})`);
-
-  const result = await generateResponse(
-    messageContext,
-    messages,
-    hints,
-    memories
-  );
-  logReply(ctxId, authorName, result, 'relevance');
-  if (result.success && result.toolCalls) {
-    await onSuccess(messageContext);
-  }
+  await handleRelevance({ messageContext, channelMode });
 }
 
 export async function execute(args: MessageEventArgs) {
@@ -321,20 +114,20 @@ export async function execute(args: MessageEventArgs) {
     return;
   }
 
-  const text = (messageContext.event as { text?: string }).text ?? '';
+  const trigger = await getTrigger(
+    messageContext,
+    keywords,
+    messageContext.botUserId
+  );
 
-  // biome-ignore lint/performance/useTopLevelRegex: one-off pattern
-  if (/^!stop\b/i.test(text)) {
-    await setSilenced(ctxId);
-    clearQueue(ctxId);
-    logger.info({ ctxId }, 'Thread silenced and queue cleared via !stop');
-    await messageContext.client.chat.postMessage({
-      channel: messageContext.event.channel,
-      thread_ts: (messageContext.event as { thread_ts?: string }).thread_ts,
-      text: "aight, i'll shut up now. ping me if u wanna talk",
-    });
-    return;
+  if (trigger.type === 'ping') {
+    const raw = (messageContext.event as { text?: string }).text ?? '';
+    const text = raw.replace(/<@[A-Z0-9]+>/gi, '').trimStart();
+    const inlineResult = await handleInlineCommand(messageContext, ctxId, text);
+    if (inlineResult === 'handled') {
+      return;
+    }
   }
 
-  return await getQueue(ctxId).add(async () => handleMessage(args));
+  return await getQueue(ctxId).add(async () => handleMessage(args, trigger));
 }

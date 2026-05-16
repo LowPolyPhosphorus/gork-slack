@@ -2,7 +2,7 @@ import type {
   AllMiddlewareArgs,
   SlackCommandMiddlewareArgs,
 } from '@slack/bolt';
-import { isAdmin } from '~/lib/reports';
+import { isAdmin } from '~/lib/permissions';
 import { executeUnban } from '~/lib/slack/bans';
 import { respondWithPermissionError } from '~/lib/slack/errors';
 import { parseUserList } from '~/utils/users';
@@ -18,7 +18,7 @@ export async function execute(
 
   await ack();
 
-  if (!isAdmin(adminId)) {
+  if (!(await isAdmin(client, adminId))) {
     await respondWithPermissionError(context);
     return;
   }
@@ -44,6 +44,7 @@ export async function execute(
     view: {
       type: 'modal',
       callback_id: 'unban_user_modal',
+      private_metadata: JSON.stringify({ openedBy: adminId }),
       title: {
         type: 'plain_text',
         text: 'Unban User',

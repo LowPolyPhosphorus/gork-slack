@@ -3,12 +3,10 @@ import type {
   SlackViewMiddlewareArgs,
   ViewSubmitAction,
 } from '@slack/bolt';
-import {
-  getUserReports,
-  isAdmin,
-  isUserBanned,
-  userReportBlocks,
-} from '~/lib/reports';
+import logger from '~/lib/logger';
+import { getUserReports, isUserBanned, userReportBlocks } from '~/lib/reports';
+import { section } from '~/lib/slack/blocks';
+import { isViewOwner } from './metadata';
 
 export const name = 'view_reports_modal';
 
@@ -16,10 +14,11 @@ export async function execute({
   ack,
   body,
   view,
-}: SlackViewMiddlewareArgs<ViewSubmitAction> & AllMiddlewareArgs) {
+}: SlackViewMiddlewareArgs<ViewSubmitAction> &
+  AllMiddlewareArgs): Promise<void> {
   const adminId = body.user.id;
 
-  if (!isAdmin(adminId)) {
+  if (!isViewOwner(view.private_metadata, adminId)) {
     await ack({
       response_action: 'errors',
       errors: {
@@ -41,27 +40,45 @@ export async function execute({
     return;
   }
 
-  const [userReports, isBanned] = await Promise.all([
-    getUserReports(userId),
-    isUserBanned(userId),
-  ]);
+  try {
+    const [userReports, isBanned] = await Promise.all([
+      getUserReports(userId),
+      isUserBanned(userId),
+    ]);
 
-  const blocks = userReportBlocks(userId, userReports, isBanned);
-
-  await ack({
-    response_action: 'update',
-    view: {
-      type: 'modal',
-      callback_id: 'view_reports_result',
-      title: {
-        type: 'plain_text',
-        text: 'User Reports',
+    await ack({
+      response_action: 'update',
+      view: {
+        type: 'modal',
+        callback_id: 'view_reports_result',
+        title: {
+          type: 'plain_text',
+          text: 'User Reports',
+        },
+        close: {
+          type: 'plain_text',
+          text: 'Close',
+        },
+        blocks: userReportBlocks(userId, userReports, isBanned),
       },
-      close: {
-        type: 'plain_text',
-        text: 'Close',
+    });
+  } catch (error) {
+    logger.error({ error, userId }, 'Failed to load reports from modal');
+    await ack({
+      response_action: 'update',
+      view: {
+        type: 'modal',
+        callback_id: 'view_reports_result',
+        title: {
+          type: 'plain_text',
+          text: 'User Reports',
+        },
+        close: {
+          type: 'plain_text',
+          text: 'Close',
+        },
+        blocks: [section('failed to load reports. try again in a bit')],
       },
-      blocks,
-    },
-  });
+    });
+  }
 }

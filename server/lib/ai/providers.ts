@@ -31,7 +31,9 @@ const onModelError = (context: {
   current: { model: { provider: string; modelId: string } };
 }) => {
   const { model } = context.current;
+  const error = (context.current as { error?: unknown }).error;
   logger.error(
+    { error },
     `error with model ${model.provider}/${model.modelId}, switching to next model`
   );
 };

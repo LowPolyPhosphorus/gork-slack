@@ -52,6 +52,7 @@ export async function assessRelevance(
       output: Output.object({
         schema: probabilitySchema,
       }),
+      maxOutputTokens: 512,
       temperature: 0.9,
       system: systemPrompt({
         selectedChatModel: 'relevance-model',

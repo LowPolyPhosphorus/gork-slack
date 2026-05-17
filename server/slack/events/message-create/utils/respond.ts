@@ -83,7 +83,7 @@ export async function generateResponse(
           },
         },
       },
-      maxOutputTokens: 4096,
+      maxOutputTokens: 16_384,
       temperature: 1.1,
       toolChoice: 'required',
       tools: {

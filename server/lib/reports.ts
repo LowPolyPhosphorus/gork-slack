@@ -35,7 +35,7 @@ export async function validateReport(
       output: Output.object({
         schema: contentFilterSchema,
       }),
-      maxOutputTokens: 512,
+      maxOutputTokens: 8192,
       prompt: contentFilterPrompt([messageContent]),
       temperature: 0.3,
       experimental_telemetry: {

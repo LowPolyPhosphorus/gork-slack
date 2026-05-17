@@ -1,21 +1,12 @@
 # Gork Slack
 
-A human-like bot (called Gork) that is almost indistinguishable from a real person. This is a port of the original Gork for Discord to Slack.
+A human-like Slack bot almost indistinguishable from a real person.
 
-## Project Overview
+## Package Manager
 
-### Package Manager
+Always use **bun**. Never use npm, yarn, or pnpm.
 
-Always use **bun** as the package manager. Never use npm, yarn, or pnpm.
-
-```bash
-bun install          # Install dependencies
-bun add <pkg>        # Add a dependency
-bun add -d <pkg>     # Add a dev dependency
-bun remove <pkg>     # Remove a dependency
-```
-
-### Scripts
+## Scripts
 
 | Command | Description |
 |---------|-------------|
@@ -23,22 +14,20 @@ bun remove <pkg>     # Remove a dependency
 | `bun run start` | Start production server |
 | `bun run check` | Run linter checks |
 | `bun run check:write` | Fix linting issues |
-| `bun run check:unsafe` | Fix linting issues (including unsafe fixes) |
 | `bun run check:spelling` | Check spelling |
 | `bun run typecheck` | Run TypeScript type checking |
 
-### Tech Stack
+## Tech Stack
 
-- **Runtime**: Bun
-- **Language**: TypeScript
-- **AI SDK**: Vercel AI SDK v5 with ai-retry for fallback
+- **Runtime**: Bun / TypeScript
 - **Slack**: @slack/bolt
-- **Vector DB**: Pinecone (for memory/RAG)
-- **Cache/Rate Limiting**: Redis
-- **Linting/Formatting**: Ultracite (Biome)
+- **AI**: Vercel AI SDK v5 with ai-retry fallback
+- **Vector DB**: Pinecone (memory/RAG)
+- **Cache / Rate Limiting**: Redis
+- **Linting / Formatting**: Ultracite (Biome)
 - **Observability**: Langfuse + OpenTelemetry
 
-### Environment Variables
+## Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -49,51 +38,18 @@ bun remove <pkg>     # Remove a dependency
 | `PORT` | No | HTTP port (default: 3000) |
 | `AUTO_ADD_CHANNEL` | No | Channel to auto-add users who ping the bot |
 | `OPT_IN_CHANNEL` | No | Required channel membership for bot usage |
-| `REDIS_URL` | Yes | Redis connection string for rate limiting |
+| `REDIS_URL` | Yes | Redis connection string |
 | `OPENROUTER_API_KEY` | Yes | OpenRouter API key |
 | `HACKCLUB_API_KEY` | Yes | Hack Club AI proxy API key |
 | `EXA_API_KEY` | Yes | Exa web search API key |
 | `PINECONE_API_KEY` | Yes | Pinecone API key |
 | `PINECONE_INDEX` | Yes | Pinecone index name |
-| `LANGFUSE_SECRET_KEY` | No | Langfuse secret key for tracing |
+| `LANGFUSE_SECRET_KEY` | No | Langfuse secret key |
 | `LANGFUSE_PUBLIC_KEY` | No | Langfuse public key |
 | `LANGFUSE_BASEURL` | No | Langfuse endpoint URL |
-| `LOG_LEVEL` | No | Log level: debug, info, warn, error (default: info) |
+| `LOG_LEVEL` | No | debug / info / warn / error (default: info) |
 | `LOG_DIRECTORY` | No | Directory for log files (default: logs) |
 
-### Project Structure
-
-```
-server/
-├── index.ts              # Entry point, starts Slack app
-├── env.ts                # Environment variable validation (t3-env + zod)
-├── config.ts             # Bot configuration (keywords, speed, memory limits)
-├── lib/
-│   ├── ai/
-│   │   ├── providers.ts  # AI model configuration with fallback chains
-│   │   ├── prompts/      # System prompts (personality, core, examples, tools)
-│   │   ├── tools/        # AI tools (reply, react, skip, get-weather, etc.)
-│   │   ├── memory/       # Memory text generation
-│   │   └── utils.ts      # AI utilities
-│   ├── pinecone/         # Vector database operations
-│   ├── memory/           # Memory storage and retrieval
-│   ├── validators/       # Response validators (SFW, probability)
-│   ├── kv.ts             # Redis client and rate limiting
-│   ├── logger.ts         # Pino logger configuration
-│   └── allowed-users.ts  # User allowlist management
-├── slack/
-│   ├── app.ts            # Slack Bolt app initialization
-│   ├── conversations.ts  # Conversation history fetching
-│   └── events/
-│       ├── index.ts      # Event registration
-│       └── message-create/
-│           ├── index.ts  # Message event handler
-│           └── utils/
-│               ├── respond.ts    # Response generation
-│               └── relevance.ts  # Relevance assessment
-├── types/                # TypeScript type definitions
-└── utils/                # Utility functions (messages, users, time, etc.)
-```
 
 ## How Gork Works
 

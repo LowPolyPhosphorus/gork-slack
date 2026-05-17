@@ -1,4 +1,5 @@
 import type { SlackMessageContext, SlackMessageEvent } from '~/types';
+import { getGroupMentions } from '~/utils/blocks';
 import { primeSlackUserName } from '~/utils/users';
 
 export type TriggerType = 'ping' | 'keyword' | 'dm' | null;
@@ -14,22 +15,6 @@ function isPlainMessage(
     'user' in event &&
     typeof (event as { user?: unknown }).user === 'string'
   );
-}
-
-type BlockEl = { type?: string; usergroup_id?: string; elements?: BlockEl[] };
-
-export function getGroupMentions(blocks: unknown): string[] {
-  if (!Array.isArray(blocks)) {
-    return [];
-  }
-  return (blocks as BlockEl[])
-    .flatMap((b) => b.elements ?? [])
-    .flatMap((s) => s.elements ?? [])
-    .filter(
-      (e): e is BlockEl & { usergroup_id: string } =>
-        e.type === 'usergroup' && !!e.usergroup_id
-    )
-    .map((e) => e.usergroup_id);
 }
 
 export interface Trigger {

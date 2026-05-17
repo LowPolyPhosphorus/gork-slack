@@ -7,8 +7,7 @@ export const mode: CommandHelp = {
     {
       usage: 'mode set [workspace|channel] <mode>',
       description:
-        'Set the reply mode. Workspace scope requires admin. Omit scope to open a modal.',
-      permissions: ['admin (workspace scope)'],
+        'Set the reply mode. Omit scope to open a modal. Workspace scope requires admin.',
     },
     {
       usage: 'mode show [workspace|channel]',
@@ -17,7 +16,6 @@ export const mode: CommandHelp = {
     {
       usage: 'mode clear <workspace|channel>',
       description: 'Clear a stored mode. Workspace scope requires admin.',
-      permissions: ['admin (workspace scope)'],
     },
   ],
   modes: [

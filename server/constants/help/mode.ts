@@ -22,11 +22,12 @@ export const mode: CommandHelp = {
     { name: 'ping', description: 'Only respond when directly @mentioned.' },
     {
       name: 'relevance',
-      description: 'Respond when AI decides the message is relevant (default).',
+      description:
+        'Respond to @mentions, keyword matches, and when AI decides the message is relevant (default).',
     },
     {
       name: 'ping+keyword',
-      description: 'Respond to @mentions and keyword matches.',
+      description: 'Respond to @mentions and keyword matches only.',
     },
     {
       name: 'none',

@@ -23,7 +23,7 @@ export const mode: CommandHelp = {
     {
       name: 'relevance',
       description:
-        'Respond to @mentions, keyword matches, and when AI decides the message is relevant (default).',
+        'Respond to @mentions, keywords, and AI relevance (default).',
     },
     {
       name: 'keyword',

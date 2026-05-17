@@ -18,7 +18,12 @@ export async function execute(
   const channelId = body.channel_id;
   const workspaceId = body.team_id;
   const userId = body.user_id;
-  const { subcommand, scope, mode } = parseArgs(command.text ?? '');
+  const { subcommand, scope, mode, error } = parseArgs(command.text ?? '');
+
+  if (error) {
+    await respond({ text: error, response_type: 'ephemeral' });
+    return;
+  }
 
   switch (subcommand) {
     case 'set': {

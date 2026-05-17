@@ -1,35 +1,22 @@
-import { isResponseMode, type ModeScope, type ResponseMode } from '~/lib/kv';
-import { splitArgs } from '~/utils/text';
+import { z } from 'zod';
+import { parseCommandArgs } from '~/utils/args';
 
 export const SUBCOMMANDS = ['set', 'show', 'clear'] as const;
 export type Subcommand = (typeof SUBCOMMANDS)[number];
 
-export interface ParsedArgs {
-  mode: ResponseMode | undefined;
-  scope: ModeScope | null;
-  subcommand: Subcommand | null;
-}
+export type ParsedArgs = ReturnType<typeof parseArgs>;
 
-// Arg layout (after subcommand): [scope] [mode]
-//
-//   "set relevance"           → subcommand=set, scope=null,      mode=relevance
-//   "set workspace relevance" → subcommand=set, scope=workspace,  mode=relevance
-//   "show workspace"          → subcommand=show, scope=workspace, mode=undefined
-//   "clear"                   → subcommand=clear, scope=null,     mode=undefined
-export function parseArgs(text: string): ParsedArgs {
-  const [sub, a0, a1] = splitArgs(text).map((t) => t.toLowerCase());
-  const subcommand =
-    sub && (SUBCOMMANDS as readonly string[]).includes(sub)
-      ? (sub as Subcommand)
-      : null;
-  const [arg0, arg1] = subcommand ? [a0, a1] : [sub, a0];
-  const scope =
-    arg0 === 'workspace' || arg0 === 'channel' ? (arg0 as ModeScope) : null;
-  const modeToken = scope ? arg1 : arg0;
+export function parseArgs(text: string) {
+  const result = parseCommandArgs(text, {
+    subcommand: z.enum(SUBCOMMANDS).optional(),
+    scope: z.enum(['workspace', 'channel']).optional(),
+    mode: z.enum(['ping', 'relevance', 'ping+keyword', 'none']).optional(),
+  });
 
   return {
-    subcommand,
-    scope,
-    mode: modeToken && isResponseMode(modeToken) ? modeToken : undefined,
+    subcommand: result.success ? (result.data.subcommand ?? null) : null,
+    scope: result.success ? (result.data.scope ?? null) : null,
+    mode: result.success ? result.data.mode : undefined,
+    error: result.success ? null : result.error,
   };
 }

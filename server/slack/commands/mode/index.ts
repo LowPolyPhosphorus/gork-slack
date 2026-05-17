@@ -21,7 +21,10 @@ export async function execute(
   const { subcommand, scope, mode, error } = parseArgs(command.text ?? '');
 
   if (error) {
-    await respond({ text: error, response_type: 'ephemeral' });
+    await respond({
+      text: `${error}\nRun \`${command.command} help mode\` for help.`,
+      response_type: 'ephemeral',
+    });
     return;
   }
 

@@ -3,9 +3,10 @@ import type {
   SlackCommandMiddlewareArgs,
 } from '@slack/bolt';
 import type { KnownBlock } from '@slack/types';
+import { z } from 'zod';
 import { ban, mode, reports, unban } from '~/constants/help';
 import { context as contextBlock, divider, section } from '~/lib/slack/blocks';
-import { splitArgs } from '~/utils/text';
+import { parseCommandArgs } from '~/utils/args';
 
 export const name = 'help';
 
@@ -31,13 +32,10 @@ function buildOverviewBlocks(cmd: string): KnownBlock[] {
 }
 
 function buildCommandBlocks(
-  commandName: string,
+  commandName: (typeof commands)[number]['name'],
   cmd: string
-): KnownBlock[] | null {
-  const command = commands.find((c) => c.name === commandName);
-  if (!command) {
-    return null;
-  }
+): KnownBlock[] {
+  const command = commands.find((c) => c.name === commandName)!;
 
   const subcommandText = command.subcommands
     .map((s) => {
@@ -71,23 +69,24 @@ export async function execute(
 
   await ack();
 
-  const [commandName] = splitArgs(command.text ?? '');
+  const result = parseCommandArgs(command.text ?? '', {
+    command: z.enum(['ban', 'unban', 'reports', 'mode']).optional(),
+  });
+
+  if (!result.success) {
+    await respond({
+      text: `${result.error}\nRun \`${command.command} help\` to see all commands.`,
+      response_type: 'ephemeral',
+    });
+    return;
+  }
+
+  const commandName = result.data.command ?? null;
 
   if (commandName) {
-    const blocks = buildCommandBlocks(
-      commandName.toLowerCase(),
-      command.command
-    );
-    if (!blocks) {
-      await respond({
-        text: `unknown command \`${commandName}\`. run \`${command.command} help\` to see all commands.`,
-        response_type: 'ephemeral',
-      });
-      return;
-    }
     await respond({
       text: `Help: ${commandName}`,
-      blocks,
+      blocks: buildCommandBlocks(commandName, command.command),
       response_type: 'ephemeral',
     });
     return;

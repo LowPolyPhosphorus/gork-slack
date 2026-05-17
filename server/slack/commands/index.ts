@@ -50,7 +50,7 @@ async function handleGorkCommand(
   if (!handler) {
     await context.ack();
     await respond({
-      text: `Unknown subcommand: \`${subcommand}\`\nRun \`${command.command} help\` to see all available commands.`,
+      text: `Unknown subcommand: \`${subcommand}\`\nRun \`${command.command} help\` to see all commands.`,
       response_type: 'ephemeral',
     });
     return;

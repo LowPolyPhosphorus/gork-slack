@@ -26,6 +26,13 @@ export async function handleSet(
   if (mode) {
     const id = scope === 'workspace' ? workspaceId : channelId;
 
+    if (scope === 'workspace' && mode === 'none') {
+      await respond({
+        text: '`none` can only be set at the channel scope.',
+        response_type: 'ephemeral',
+      });
+      return;
+    }
     if (scope === 'workspace' && !(await isAdmin(client, userId))) {
       await respond({
         text: 'only workspace admins can set the workspace mode.',

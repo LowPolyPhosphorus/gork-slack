@@ -71,6 +71,14 @@ export async function execute({
     return;
   }
 
+  if (scope === 'workspace' && mode === 'none') {
+    await ack({
+      response_action: 'errors',
+      errors: { mode_select: '`none` can only be set at the channel scope.' },
+    });
+    return;
+  }
+
   if (scope === 'workspace' && !canManageProtectedScope) {
     await ack({
       response_action: 'errors',

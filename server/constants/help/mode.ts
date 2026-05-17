@@ -28,6 +28,9 @@ export const mode: CommandHelp = {
       name: 'ping+keyword',
       description: 'Respond to @mentions and keyword matches.',
     },
-    { name: 'none', description: 'Never respond in this channel.' },
+    {
+      name: 'none',
+      description: 'Never respond in this channel. (channel only)',
+    },
   ],
 };

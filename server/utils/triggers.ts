@@ -16,6 +16,22 @@ function isPlainMessage(
   );
 }
 
+type BlockEl = { type?: string; usergroup_id?: string; elements?: BlockEl[] };
+
+export function getGroupMentions(blocks: unknown): string[] {
+  if (!Array.isArray(blocks)) {
+    return [];
+  }
+  return (blocks as BlockEl[])
+    .flatMap((b) => b.elements ?? [])
+    .flatMap((s) => s.elements ?? [])
+    .filter(
+      (e): e is BlockEl & { usergroup_id: string } =>
+        e.type === 'usergroup' && !!e.usergroup_id
+    )
+    .map((e) => e.usergroup_id);
+}
+
 export interface Trigger {
   info: string | string[] | null;
   type: TriggerType;
@@ -45,6 +61,24 @@ export async function getTrigger(
       return { type: 'ping', info: displayName ?? botId };
     } catch {
       return { type: 'ping', info: botId };
+    }
+  }
+
+  if (botId) {
+    const groupIds = getGroupMentions((event as { blocks?: unknown }).blocks);
+    const matchedGroups: string[] = [];
+    for (const groupId of groupIds) {
+      try {
+        const res = await client.usergroups.users.list({ usergroup: groupId });
+        if ((res.users ?? []).includes(botId)) {
+          matchedGroups.push(groupId);
+        }
+      } catch {
+        // skip groups we can't check
+      }
+    }
+    if (matchedGroups.length > 0) {
+      return { type: 'ping', info: matchedGroups };
     }
   }
 

@@ -5,6 +5,7 @@ import { provider } from '~/lib/ai/providers';
 import logger from '~/lib/logger';
 import { contentFilterSchema } from '~/lib/validators';
 import type { SlackMessageContext } from '~/types';
+import { getGroupMentions } from '~/utils/triggers';
 import { getSlackUserName } from '~/utils/users';
 
 interface SlackHistoryMessage {
@@ -151,10 +152,22 @@ export const reply = ({ context }: { context: SlackMessageContext }) =>
         .describe('Reply in a thread or post directly in the channel.'),
     }),
     execute: async ({ offset = 0, content, type }) => {
-      const channelId = (context.event as { channel?: string }).channel;
-      const messageTs = (context.event as { ts?: string }).ts;
-      const currentThread = (context.event as { thread_ts?: string }).thread_ts;
-      const userId = (context.event as { user?: string }).user;
+      const ev = context.event as {
+        channel?: string;
+        ts?: string;
+        thread_ts?: string;
+        blocks?: unknown;
+        user?: string;
+      };
+      const {
+        channel: channelId,
+        ts: messageTs,
+        thread_ts: currentThread,
+        blocks,
+        user: userId,
+      } = ev;
+      const forceChannelReply =
+        !currentThread && getGroupMentions(blocks).length > 0;
 
       if (!(channelId && messageTs)) {
         return { success: false, error: 'Missing Slack channel or timestamp' };
@@ -176,9 +189,11 @@ export const reply = ({ context }: { context: SlackMessageContext }) =>
           };
         }
 
+        const effectiveType =
+          forceChannelReply && !currentThread ? 'message' : type;
         const target = await resolveTargetMessage(context, offset);
         const threadTs =
-          type === 'reply'
+          effectiveType === 'reply'
             ? resolveThreadTs(target, currentThread ?? messageTs)
             : undefined;
 
@@ -198,7 +213,7 @@ export const reply = ({ context }: { context: SlackMessageContext }) =>
           {
             channel: channelId,
             offset,
-            type,
+            type: effectiveType,
             author: authorName,
             content,
           },
@@ -207,7 +222,10 @@ export const reply = ({ context }: { context: SlackMessageContext }) =>
 
         return {
           success: true,
-          content: 'Sent reply to Slack channel',
+          content:
+            effectiveType === type
+              ? 'Sent reply to Slack channel'
+              : `Sent reply to Slack channel (type overridden from "${type}" to "${effectiveType}")`,
         };
       } catch (error) {
         logger.error(

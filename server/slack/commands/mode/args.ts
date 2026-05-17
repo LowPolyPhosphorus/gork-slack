@@ -10,7 +10,7 @@ export function parseArgs(text: string) {
   const result = parseCommandArgs(text, {
     subcommand: z.enum(SUBCOMMANDS).optional(),
     scope: z.enum(['workspace', 'channel']).optional(),
-    mode: z.enum(['ping', 'relevance', 'ping+keyword', 'none']).optional(),
+    mode: z.enum(['ping', 'relevance', 'keyword', 'none']).optional(),
   });
 
   return {

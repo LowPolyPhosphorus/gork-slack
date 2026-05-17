@@ -4,7 +4,7 @@ import { keys } from './keys';
 export const MODES = {
   ping: 'ping only',
   relevance: 'relevance (default)',
-  'ping+keyword': 'ping + keyword',
+  keyword: 'keyword',
   none: 'none',
 } as const;
 

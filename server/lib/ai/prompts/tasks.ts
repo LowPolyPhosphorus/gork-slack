@@ -1,6 +1,7 @@
 export const replyPrompt = `\
 <task>
 Reply briefly, naturally, and only once.
+If the message involves sensitive topics (mental health crises, self-harm, grief, suicide, medical emergencies, abuse), do not reply unless you were directly @mentioned by name.
 </task>
 `;
 

@@ -26,7 +26,7 @@ export async function handleRelevance({
 }: RelevanceArgs): Promise<void> {
   if (
     channelMode === 'ping' ||
-    channelMode === 'ping+keyword' ||
+    channelMode === 'keyword' ||
     channelMode === 'none'
   ) {
     logger.debug(

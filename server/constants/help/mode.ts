@@ -26,7 +26,7 @@ export const mode: CommandHelp = {
         'Respond to @mentions, keyword matches, and when AI decides the message is relevant (default).',
     },
     {
-      name: 'ping+keyword',
+      name: 'keyword',
       description: 'Respond to @mentions and keyword matches only.',
     },
     {

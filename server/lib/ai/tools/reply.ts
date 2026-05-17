@@ -5,7 +5,7 @@ import { provider } from '~/lib/ai/providers';
 import logger from '~/lib/logger';
 import { contentFilterSchema } from '~/lib/validators';
 import type { SlackMessageContext } from '~/types';
-import { getGroupMentions } from '~/utils/triggers';
+import { getGroupMentions } from '~/utils/blocks';
 import { getSlackUserName } from '~/utils/users';
 
 interface SlackHistoryMessage {

@@ -1,11 +1,8 @@
-import { generateText, Output, tool } from 'ai';
+import { Output, tool } from 'ai';
 import { z } from 'zod';
-import { contentFilterPrompt } from '~/lib/ai/prompts/tasks';
-import { provider } from '~/lib/ai/providers';
 import logger from '~/lib/logger';
-import { contentFilterSchema } from '~/lib/validators';
 import type { SlackMessageContext } from '~/types';
-import { getGroupMentions } from '~/utils/triggers';
+import { getGroupMentions } from '~/utils/blocks';
 import { getSlackUserName } from '~/utils/users';
 
 interface SlackHistoryMessage {
@@ -66,66 +63,6 @@ function resolveThreadTs(
   return;
 }
 
-async function checkContent(
-  content: string[],
-  contextMessages?: string[]
-): Promise<{ safe: boolean; reason: string }> {
-  try {
-    const { output } = await generateText({
-      model: provider.languageModel('content-filter-model'),
-      output: Output.object({
-        schema: contentFilterSchema,
-      }),
-      prompt: contentFilterPrompt(content, contextMessages),
-      temperature: 0.3,
-      experimental_telemetry: {
-        isEnabled: true,
-        functionId: 'filter',
-      },
-    });
-    return output;
-  } catch (error) {
-    logger.error({ error, content }, 'Content filter check failed');
-    return { safe: false, reason: 'Content filter check failed' };
-  }
-}
-
-async function fetchRecentMessages(
-  ctx: SlackMessageContext,
-  limit = 5
-): Promise<string[]> {
-  const channelId = (ctx.event as { channel?: string }).channel;
-  const messageTs = (ctx.event as { ts?: string }).ts;
-
-  if (!(channelId && messageTs)) {
-    return [];
-  }
-
-  try {
-    const { messages } = await ctx.client.conversations.history({
-      channel: channelId,
-      latest: messageTs,
-      inclusive: true,
-      limit,
-    });
-
-    if (!messages) {
-      return [];
-    }
-
-    return messages
-      .filter((msg) => Boolean(msg.text))
-      .sort((a, b) => Number(a.ts ?? '0') - Number(b.ts ?? '0'))
-      .map((msg) => `${msg.user}: ${msg.text}`);
-  } catch (error) {
-    logger.error(
-      { error, channel: channelId },
-      'Failed to fetch recent messages for content filter'
-    );
-    return [];
-  }
-}
-
 export const reply = ({ context }: { context: SlackMessageContext }) =>
   tool({
     description:
@@ -174,21 +111,6 @@ export const reply = ({ context }: { context: SlackMessageContext }) =>
       }
 
       try {
-        const contextMessages = await fetchRecentMessages(context);
-        const contentCheck = await checkContent(content, contextMessages);
-        if (!contentCheck.safe) {
-          logger.warn(
-            { content, reason: contentCheck.reason },
-            'Blocked unsafe content from being sent'
-          );
-
-          return {
-            success: true,
-            blocked: true,
-            content: `Message blocked by filter: ${contentCheck.reason}. Do NOT retry.`,
-          };
-        }
-
         const effectiveType =
           forceChannelReply && !currentThread ? 'message' : type;
         const target = await resolveTargetMessage(context, offset);

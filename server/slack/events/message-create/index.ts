@@ -79,9 +79,7 @@ async function handleMessage(
     channelId: args.event.channel,
   });
 
-  const routeToTrigger =
-    trigger.type != null &&
-    !(trigger.type === 'keyword' && channelMode === 'relevance');
+  const routeToTrigger = trigger.type != null;
 
   if (routeToTrigger && trigger.type != null) {
     const channel = (args.event as { channel?: string }).channel;

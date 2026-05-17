@@ -37,8 +37,8 @@ export const searchMemories = async (
       filter,
     });
 
-    const matches = result.matches || [];
-    return matches.flatMap((match) => {
+    const matches = result.matches ?? [];
+    return matches.flatMap((match: (typeof matches)[number]) => {
       const parsed = PineconeMetadataSchema.safeParse(match.metadata);
 
       if (!parsed.success) {

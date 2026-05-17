@@ -31,7 +31,7 @@ export async function validateReport(
 ): Promise<{ valid: boolean; reason: string }> {
   try {
     const { output } = await generateText({
-      model: provider.languageModel('content-filter-model'),
+      model: provider.languageModel('relevance-model'),
       output: Output.object({
         schema: contentFilterSchema,
       }),

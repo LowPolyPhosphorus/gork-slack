@@ -56,7 +56,6 @@ export async function handleRelevance({
     getAuthorName(messageContext),
     buildChatContext(messageContext),
   ]);
-  const content = (messageContext.event as { text?: string }).text ?? '';
 
   const { probability, reason } = await assessRelevance(
     messageContext,
@@ -64,6 +63,8 @@ export async function handleRelevance({
     chatContext.hints,
     chatContext.memories
   );
+
+  const content = (messageContext.event as { text?: string }).text ?? '';
   logger.info(
     { reason, probability, message: `${authorName}: ${content}` },
     `[${ctxId}] Relevance check`
@@ -77,15 +78,50 @@ export async function handleRelevance({
     return;
   }
 
+  const channel = (messageContext.event as { channel?: string }).channel;
+  const ts = (messageContext.event as { ts?: string }).ts;
+  const threadTs =
+    (messageContext.event as { thread_ts?: string }).thread_ts ?? ts;
+  if (channel && ts) {
+    void messageContext.client.assistant.threads
+      .setStatus({
+        channel_id: channel,
+        thread_ts: threadTs ?? ts,
+        status: 'cooking...',
+        loading_messages: [
+          'cooking...',
+          'thinking rn...',
+          'give me a sec...',
+          'on it...',
+        ],
+      })
+      .catch(() => {});
+  }
+
   logger.info(`[${ctxId}] Replying (relevance: ${probability.toFixed(2)})`);
-  const result = await generateResponse(
-    messageContext,
-    chatContext.messages,
-    chatContext.hints,
-    chatContext.memories
-  );
-  logReply(ctxId, authorName, result, 'relevance');
-  if (result.success && result.toolCalls) {
-    await saveChatMemory(messageContext, 5);
+  try {
+    const result = await generateResponse(
+      messageContext,
+      chatContext.messages,
+      chatContext.hints,
+      chatContext.memories
+    );
+    logReply(ctxId, authorName, result, 'relevance');
+    if (result.success && result.toolCalls) {
+      await saveChatMemory(messageContext, {
+        channelName: chatContext.hints.channel,
+        guildName: chatContext.hints.server,
+      });
+    }
+  } finally {
+    if (channel && ts) {
+      void messageContext.client.assistant.threads
+        .setStatus({
+          channel_id: channel,
+          thread_ts: threadTs ?? ts,
+          status: '',
+        })
+        .catch(() => {});
+    }
   }
 }

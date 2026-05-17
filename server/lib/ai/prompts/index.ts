@@ -27,11 +27,13 @@ export const systemPrompt = ({
   message,
 }: {
   selectedChatModel: string;
-  requestHints: RequestHints;
+  requestHints?: RequestHints;
   memories: ScoredPineconeRecord<PineconeMetadataOutput>[];
   message?: { author?: string; authorSlackId?: string; content?: string };
 }) => {
-  const requestPrompt = getRequestPromptFromHints(requestHints);
+  const requestPrompt = requestHints
+    ? getRequestPromptFromHints(requestHints)
+    : undefined;
 
   if (selectedChatModel === 'chat-model') {
     return [

@@ -84,11 +84,41 @@ async function handleMessage(
     !(trigger.type === 'keyword' && channelMode === 'relevance');
 
   if (routeToTrigger && trigger.type != null) {
-    await handleTriggered({
-      messageContext,
-      channelMode,
-      triggerType: trigger.type,
-    });
+    const channel = (args.event as { channel?: string }).channel;
+    const ts = (args.event as { ts?: string }).ts;
+    const threadTs = (args.event as { thread_ts?: string }).thread_ts ?? ts;
+    if (channel && ts) {
+      void args.client.assistant.threads
+        .setStatus({
+          channel_id: channel,
+          thread_ts: threadTs ?? ts,
+          status: 'cooking...',
+          loading_messages: [
+            'cooking...',
+            'thinking rn...',
+            'give me a sec...',
+            'on it...',
+          ],
+        })
+        .catch(() => {});
+    }
+    try {
+      await handleTriggered({
+        messageContext,
+        channelMode,
+        triggerType: trigger.type,
+      });
+    } finally {
+      if (channel && ts) {
+        void args.client.assistant.threads
+          .setStatus({
+            channel_id: channel,
+            thread_ts: threadTs ?? ts,
+            status: '',
+          })
+          .catch(() => {});
+      }
+    }
     return;
   }
 

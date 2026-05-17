@@ -3,47 +3,14 @@ import { getConversationMessages } from '~/slack/conversations';
 import type { SlackMessageContext } from '~/types';
 import { buildHistorySnippet } from '~/utils/messages';
 
-async function buildLocationFromMessage(message: SlackMessageContext) {
-  const channelId =
-    (message.event as { channel?: string }).channel ?? 'unknown';
-  let channelName = channelId;
-
-  try {
-    const info = await message.client.conversations.info({
-      channel: channelId,
-    });
-    if (info.channel?.is_im) {
-      channelName = 'Direct Message';
-    } else {
-      channelName =
-        info.channel?.name_normalized ?? info.channel?.name ?? channelName;
-    }
-  } catch {
-    // ignore lookup failures
-  }
-
-  let guildName = 'Slack Workspace';
-  try {
-    const info = await message.client.team.info();
-    guildName = info.team?.name ?? guildName;
-  } catch {
-    // ignore
-  }
-
-  return {
-    guild: {
-      id: message.teamId ?? null,
-      name: guildName,
-    },
-    channel: {
-      id: channelId,
-      name: channelName,
-    },
-  } as const;
+export interface ChatMemoryLocation {
+  channelName: string;
+  guildName: string;
 }
 
 export async function saveChatMemory(
   message: SlackMessageContext,
+  location: ChatMemoryLocation,
   contextLimit = 5
 ) {
   const channelId = (message.event as { channel?: string }).channel;
@@ -65,21 +32,17 @@ export async function saveChatMemory(
   });
 
   const data = buildHistorySnippet(history, contextLimit);
-
   if (!data) {
     return;
   }
-
-  const { guild, channel } = await buildLocationFromMessage(message);
 
   const metadata = {
     type: 'chat' as const,
     context: data,
     createdAt: Date.now(),
     lastRetrievalTime: Date.now(),
-    guild,
-    channel,
+    guild: { id: message.teamId ?? null, name: location.guildName },
+    channel: { id: channelId, name: location.channelName },
   };
-
   await addMemory(data, metadata);
 }

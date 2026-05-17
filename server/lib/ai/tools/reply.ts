@@ -1,4 +1,4 @@
-import { Output, tool } from 'ai';
+import { tool } from 'ai';
 import { z } from 'zod';
 import logger from '~/lib/logger';
 import type { SlackMessageContext } from '~/types';

@@ -1,6 +1,7 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { customProvider, wrapProvider } from 'ai';
 import { createRetryable } from 'ai-retry';
+import { requestNotRetryable } from 'ai-retry/retryables';
 import { env } from '~/env';
 import logger from '~/lib/logger';
 
@@ -38,10 +39,11 @@ const onModelError = (context: {
 const chatModel = createRetryable({
   model: hackclub.languageModel('google/gemini-3-flash-preview'),
   retries: [
-    hackclub.languageModel('google/gemini-2.5-flash'),
+    requestNotRetryable(
+      openrouter.languageModel('google/gemini-3-flash-preview')
+    ),
     hackclub.languageModel('openai/gpt-5-mini'),
     openrouter.languageModel('google/gemini-3-flash-preview'),
-    openrouter.languageModel('google/gemini-2.5-flash'),
     openrouter.languageModel('openai/gpt-5-mini'),
   ],
   onError: onModelError,
@@ -50,31 +52,10 @@ const chatModel = createRetryable({
 const relevanceModel = createRetryable({
   model: hackclub.languageModel('openai/gpt-5-mini'),
   retries: [
+    requestNotRetryable(openrouter.languageModel('openai/gpt-5-mini')),
     hackclub.languageModel('google/gemini-2.5-flash'),
     openrouter.languageModel('google/gemini-2.5-flash-lite'),
     openrouter.languageModel('openai/gpt-5-mini'),
-  ],
-  onError: onModelError,
-});
-
-const contentFilterModel = createRetryable({
-  model: hackclub.languageModel('openai/gpt-5-mini'),
-  retries: [
-    hackclub.languageModel('google/gemini-2.5-flash-lite'),
-    openrouter.languageModel('google/gemini-2.5-flash-lite'),
-    openrouter.languageModel('openai/gpt-5-nano'),
-  ],
-  onError: onModelError,
-});
-
-const summariserModel = createRetryable({
-  model: hackclub.languageModel('google/gemini-3-flash-preview'),
-  retries: [
-    hackclub.languageModel('google/gemini-2.5-flash'),
-    hackclub.languageModel('openai/gpt-5-mini'),
-    openrouter.languageModel('google/gemini-3-flash-preview'),
-    openrouter.languageModel('google/gemini-2.5-flash'),
-    openrouter.languageModel('openai/gpt-5-nano'),
   ],
   onError: onModelError,
 });
@@ -83,8 +64,6 @@ export const provider = customProvider({
   languageModels: {
     'chat-model': chatModel,
     'relevance-model': relevanceModel,
-    'content-filter-model': contentFilterModel,
-    'summariser-model': summariserModel,
   },
   imageModels: {
     'image-model': hackclub.imageModel('google/gemini-3.1-flash-image-preview'),

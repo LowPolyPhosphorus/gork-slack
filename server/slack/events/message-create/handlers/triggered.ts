@@ -115,6 +115,9 @@ export async function handleTriggered({
   );
   logReply(ctxId, authorName, result, 'trigger');
   if (result.success && result.toolCalls) {
-    await saveChatMemory(messageContext, 5);
+    await saveChatMemory(messageContext, {
+      channelName: chatContext.hints.channel,
+      guildName: chatContext.hints.server,
+    });
   }
 }

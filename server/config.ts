@@ -29,6 +29,8 @@ export const blockedChannels = [
   { id: 'C0188CY57PZ', name: 'meta' },
   { id: 'C0C78SG9L', name: 'hq' },
   { id: 'C0AUZ1LAMH6', name: 'macondo' },
+  { id: 'C0AU8AWD5BN', name: 'macondo-help' },
+  { id: 'C0AUZ1P2DEC', name: 'macondo-bulletin' }
 ];
 
 export const moderation = {

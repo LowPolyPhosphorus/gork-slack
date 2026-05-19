@@ -18,7 +18,7 @@ export const messageThreshold = 25;
 export const memories = {
   eachLimit: 2,
   maxMemories: 4,
-  recentAgeMs: 1000 * 60 * 60,
+  recentAge: 1000 * 60 * 60,
 };
 
 export const rateLimit = {

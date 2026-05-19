@@ -153,7 +153,7 @@ export async function buildChatContext(
       queryMemories(historySnippet, {
         namespace: 'default',
         limit: memoriesConfig.eachLimit,
-        ageLimit: memoriesConfig.recentAgeMs,
+        ageLimit: memoriesConfig.recentAge,
       }),
       queryMemories(currentMessage, {
         namespace: 'default',
@@ -162,7 +162,7 @@ export async function buildChatContext(
       queryMemories(currentMessage, {
         namespace: 'default',
         limit: memoriesConfig.eachLimit,
-        ageLimit: memoriesConfig.recentAgeMs,
+        ageLimit: memoriesConfig.recentAge,
       }),
       queryMemories(historySnippet, {
         namespace: 'default',
@@ -175,7 +175,7 @@ export async function buildChatContext(
         limit: memoriesConfig.eachLimit,
         ignoreRecent: false,
         onlyTools: true,
-        ageLimit: memoriesConfig.recentAgeMs,
+        ageLimit: memoriesConfig.recentAge,
       }),
     ]);
 

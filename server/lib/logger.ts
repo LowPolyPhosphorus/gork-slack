@@ -1,5 +1,4 @@
-import { constants } from 'node:fs';
-import { access, mkdir } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import pino, {
   transport as createTransport,
@@ -7,22 +6,11 @@ import pino, {
 } from 'pino';
 import { env } from '~/env';
 
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path, constants.F_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 const isProd = process.env.NODE_ENV === 'production';
 const logDir = env.LOG_DIRECTORY ?? 'logs';
 const logLevel = env.LOG_LEVEL ?? 'info';
 
-if (!(await exists(logDir))) {
-  await mkdir(logDir, { recursive: true });
-}
+await mkdir(logDir, { recursive: true });
 
 const runId = new Date()
   .toISOString()

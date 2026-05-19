@@ -1,19 +1,6 @@
 import { messageThreshold } from '~/config';
 import { keys, redis } from '~/lib/kv';
 
-async function getMessageCount(ctxId: string): Promise<number> {
-  const key = keys.messageCount(ctxId);
-  const n = await redis.get(key);
-  return n ? Number(n) : 0;
-}
-
-async function incrementMessageCount(ctxId: string): Promise<number> {
-  const key = keys.messageCount(ctxId);
-  const results = await Promise.all([redis.incr(key), redis.expire(key, 3600)]);
-
-  return results[0] || 1;
-}
-
 export async function resetMessageCount(ctxId: string): Promise<void> {
   await redis.del(keys.messageCount(ctxId));
 }
@@ -22,7 +9,8 @@ export async function checkMessageQuota(ctxId: string): Promise<{
   count: number;
   hasQuota: boolean;
 }> {
-  const count = await getMessageCount(ctxId);
+  const n = await redis.get(keys.messageCount(ctxId));
+  const count = n ? Number(n) : 0;
   return {
     count,
     hasQuota: count < messageThreshold,
@@ -39,5 +27,7 @@ export async function handleMessageCount(
     await redis.del(key);
     return 0;
   }
-  return await incrementMessageCount(ctxId);
+
+  const [count] = await Promise.all([redis.incr(key), redis.expire(key, 3600)]);
+  return count || 1;
 }

@@ -35,7 +35,7 @@ export async function execute({
     });
     logger.info(
       { channelId },
-      'Bot removed from channel notification sent to reports channel'
+      'Bot removed from channel notification sent to logs channel'
     );
   } catch (error) {
     logger.error(

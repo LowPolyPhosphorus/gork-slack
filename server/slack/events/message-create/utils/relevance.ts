@@ -19,29 +19,23 @@ export async function assessRelevance(
   memories: ScoredPineconeRecord<PineconeMetadataOutput>[]
 ): Promise<Probability> {
   try {
-    const userId = (context.event as { user?: string }).user;
-    const messageText = (context.event as { text?: string }).text ?? '';
+    const { user: userId, text: messageText = '' } = context.event;
     const files = (context.event as { files?: SlackFile[] }).files;
     const authorName = userId
       ? await getSlackUserName(context.client, userId)
       : 'user';
 
-    // Process images from the current message for relevance assessment
-    const imageContents = await processSlackFiles(files);
-
-    // Build messages with current message images if present
+    const images = await processSlackFiles(files);
     let relevanceMessages = messages;
-    if (imageContents.length > 0) {
-      // Add the current message with images to the context
-      const currentMessageContent: UserContent = [
-        { type: 'text' as const, text: `${authorName}: ${messageText}` },
-        ...imageContents,
-      ];
+    if (images.length > 0) {
       relevanceMessages = [
         ...messages,
         {
-          role: 'user' as const,
-          content: currentMessageContent,
+          role: 'user',
+          content: [
+            { type: 'text', text: `${authorName}: ${messageText}` },
+            ...images,
+          ] as UserContent,
         },
       ];
     }

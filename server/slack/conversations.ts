@@ -1,8 +1,7 @@
-import type { WebClient } from '@slack/web-api';
+import type { ConversationsHistoryResponse, WebClient } from '@slack/web-api';
 import type { ModelMessage, UserContent } from 'ai';
 import logger from '~/lib/logger';
 import { processSlackFiles, type SlackFile } from '~/utils/images';
-import { shouldUse } from '~/utils/messages';
 
 interface ConversationOptions {
   botUserId?: string;
@@ -15,14 +14,9 @@ interface ConversationOptions {
   threadTs?: string;
 }
 
-interface SlackMessage {
-  bot_id?: string;
-  files?: SlackFile[];
-  subtype?: string;
-  text?: string;
-  ts?: string;
-  user?: string;
-}
+type SlackMessage = NonNullable<
+  ConversationsHistoryResponse['messages']
+>[number];
 
 export async function getConversationMessages({
   client,
@@ -59,7 +53,7 @@ export async function getConversationMessages({
           if (!message.ts) {
             return false;
           }
-          if (!shouldUse(message.text || '')) {
+          if (message.text?.startsWith('##')) {
             return false;
           }
           const messageTs = Number(message.ts);
@@ -119,36 +113,18 @@ export async function getConversationMessages({
 
         const formattedText = `${author} (${message.user}): ${textContent}`;
 
-        // Bot/assistant messages can only have text content
         if (isBot) {
-          return {
-            role: 'assistant' as const,
-            content: formattedText,
-          };
+          return { role: 'assistant', content: formattedText };
         }
 
-        // Process images from files for user messages
-        const imageContents = await processSlackFiles(message.files);
-
-        // If there are images, create a multi-part content message
-        if (imageContents.length > 0) {
-          const contentParts: UserContent = [
-            {
-              type: 'text' as const,
-              text: formattedText,
-            },
-            ...imageContents,
-          ];
-
-          return {
-            role: 'user' as const,
-            content: contentParts,
-          };
-        }
-
+        const images = await processSlackFiles(
+          message.files as SlackFile[] | undefined
+        );
         return {
-          role: 'user' as const,
-          content: formattedText,
+          role: 'user',
+          content: (images.length
+            ? [{ type: 'text', text: formattedText }, ...images]
+            : formattedText) as UserContent,
         };
       })
     );

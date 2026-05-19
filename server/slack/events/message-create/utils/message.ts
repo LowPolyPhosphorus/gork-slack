@@ -1,6 +1,29 @@
 import type { AllMiddlewareArgs, SlackEventMiddlewareArgs } from '@slack/bolt';
+import { loadingMessages } from '~/config';
 import logger from '~/lib/logger';
 import type { SlackMessageContext } from '~/types';
+
+export function setThreadStatus({
+  ctx,
+  active,
+}: {
+  ctx: SlackMessageContext;
+  active: boolean;
+}): void {
+  const { channel, ts, thread_ts } = ctx.event;
+  const threadTs = ts ? (thread_ts ?? ts) : undefined;
+  if (!(channel && threadTs)) {
+    return;
+  }
+  ctx.client.assistant.threads
+    .setStatus({
+      channel_id: channel,
+      thread_ts: threadTs,
+      status: active ? 'cooking...' : '',
+      ...(active && { loading_messages: loadingMessages }),
+    })
+    .catch(() => undefined);
+}
 
 export type MessageEventArgs = SlackEventMiddlewareArgs<'message'> &
   AllMiddlewareArgs;
@@ -43,7 +66,7 @@ export function isProcessableMessage(
 }
 
 export async function getAuthorName(ctx: SlackMessageContext): Promise<string> {
-  const userId = (ctx.event as { user?: string }).user;
+  const { user: userId } = ctx.event;
   if (!userId) {
     return 'unknown';
   }
@@ -63,9 +86,11 @@ export async function getAuthorName(ctx: SlackMessageContext): Promise<string> {
 
 export function getContextId(ctx: SlackMessageContext): string {
   const channel = ctx.event.channel ?? 'unknown-channel';
-  const channelType = ctx.event.channel_type;
-  const userId = (ctx.event as { user?: string }).user;
-  const threadTs = (ctx.event as { thread_ts?: string }).thread_ts;
+  const {
+    channel_type: channelType,
+    user: userId,
+    thread_ts: threadTs,
+  } = ctx.event;
 
   if (channelType === 'im' && userId) {
     return `dm:${userId}`;

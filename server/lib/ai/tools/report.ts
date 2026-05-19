@@ -1,14 +1,14 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { moderation } from '~/config';
+import { addReport } from '~/lib/kv';
 import logger from '~/lib/logger';
+import { getConversationMessages } from '~/slack/conversations';
 import {
-  addReport,
   sendReportNotification,
   sendStrikeLog,
-  validateReport,
-} from '~/lib/reports';
-import { getConversationMessages } from '~/slack/conversations';
+} from '~/slack/features/reports/notifications';
+import { validateReport } from '~/slack/features/reports/utils/validate-report';
 import type { SlackMessageContext } from '~/types';
 import { buildHistorySnippet, getMessageText } from '~/utils/messages';
 
@@ -20,10 +20,12 @@ export const report = ({ context }: { context: SlackMessageContext }) =>
       reason: z.string().describe('Brief description of the violation'),
     }),
     execute: async ({ reason }) => {
-      const channelId = context.event.channel;
-      const messageTs = (context.event as { ts?: string }).ts;
-      const currentThread = (context.event as { thread_ts?: string }).thread_ts;
-      const userId = (context.event as { user?: string }).user;
+      const {
+        channel: channelId,
+        ts: messageTs,
+        thread_ts: currentThread,
+        user: userId,
+      } = context.event;
 
       if (!(channelId && messageTs)) {
         return { success: false, error: 'Missing Slack channel or timestamp' };
@@ -118,7 +120,6 @@ export const report = ({ context }: { context: SlackMessageContext }) =>
           ],
         });
 
-        // Extract last 3 messages from user for moderator context
         const messageContext = userMessages
           .slice(-3)
           .map((msg) => getMessageText(msg))

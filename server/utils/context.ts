@@ -1,6 +1,6 @@
 import type { ScoredPineconeRecord } from '@pinecone-database/pinecone';
 import type { ModelMessage } from 'ai';
-import { city, country, memories as memoriesConfig, timezone } from '~/config';
+import { locale, memories as memoriesConfig } from '~/config';
 import { queryMemories } from '~/lib/pinecone/operations';
 import { getConversationMessages } from '~/slack/conversations';
 import type {
@@ -13,7 +13,7 @@ import { getTimeInCity } from '~/utils/time';
 import { getSlackUserName } from '~/utils/users';
 
 async function resolveChannelName(ctx: SlackMessageContext): Promise<string> {
-  const channelId = (ctx.event as { channel?: string }).channel;
+  const channelId = ctx.event.channel;
   if (!channelId) {
     return 'Unknown channel';
   }
@@ -83,11 +83,13 @@ export async function buildChatContext(
   let hints = opts?.hints;
   let memories = opts?.memories;
 
-  const channelId = (ctx.event as { channel?: string }).channel;
-  const threadTs = (ctx.event as { thread_ts?: string }).thread_ts;
-  const messageTs = (ctx.event as { ts?: string }).ts;
-  const text = (ctx.event as { text?: string }).text ?? '';
-  const userId = (ctx.event as { user?: string }).user;
+  const {
+    channel: channelId,
+    thread_ts: threadTs,
+    ts: messageTs,
+    text = '',
+    user: userId,
+  } = ctx.event;
 
   if (!(channelId && messageTs)) {
     throw new Error('Slack message missing channel or timestamp');
@@ -114,9 +116,9 @@ export async function buildChatContext(
 
     hints = {
       channel: channelName,
-      time: getTimeInCity(timezone),
-      city,
-      country,
+      time: getTimeInCity(locale.timezone),
+      city: locale.city,
+      country: locale.country,
       server: serverName,
       joined: botDetails.joined,
       status: botDetails.status,
@@ -132,13 +134,13 @@ export async function buildChatContext(
     const currentMessage = `${authorName}: ${text}`;
 
     const [
-      memories0,
-      memories1,
-      memories2,
-      memories3,
-      memories4,
-      memories5,
-      memories6,
+      byText,
+      byHistory,
+      byHistoryRecent,
+      byMessage,
+      byMessageRecent,
+      byHistoryTools,
+      byHistoryToolsRecent,
     ] = await Promise.all([
       queryMemories(text, {
         namespace: 'default',
@@ -151,7 +153,7 @@ export async function buildChatContext(
       queryMemories(historySnippet, {
         namespace: 'default',
         limit: memoriesConfig.eachLimit,
-        ageLimit: 1000 * 60 * 60,
+        ageLimit: memoriesConfig.recentAgeMs,
       }),
       queryMemories(currentMessage, {
         namespace: 'default',
@@ -160,7 +162,7 @@ export async function buildChatContext(
       queryMemories(currentMessage, {
         namespace: 'default',
         limit: memoriesConfig.eachLimit,
-        ageLimit: 1000 * 60 * 60,
+        ageLimit: memoriesConfig.recentAgeMs,
       }),
       queryMemories(historySnippet, {
         namespace: 'default',
@@ -173,18 +175,18 @@ export async function buildChatContext(
         limit: memoriesConfig.eachLimit,
         ignoreRecent: false,
         onlyTools: true,
-        ageLimit: 1000 * 60 * 60,
+        ageLimit: memoriesConfig.recentAgeMs,
       }),
     ]);
 
     const memoryLists = [
-      memories6,
-      memories1,
-      memories4,
-      memories3,
-      memories5,
-      memories0,
-      memories2,
+      byHistoryToolsRecent,
+      byHistory,
+      byMessageRecent,
+      byMessage,
+      byHistoryTools,
+      byText,
+      byHistoryRecent,
     ];
 
     const combined: ScoredPineconeRecord<PineconeMetadataOutput>[] = [];

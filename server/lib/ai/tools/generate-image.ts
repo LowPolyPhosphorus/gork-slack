@@ -6,7 +6,7 @@ import type { SlackMessageContext } from '~/types';
 import { toLogError } from '~/utils/error';
 import { processSlackFiles, type SlackFile } from '~/utils/images';
 
-const MIME_TYPE_TO_EXTENSION: Record<string, string> = {
+const EXTENSION: Record<string, string> = {
   'image/gif': 'gif',
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -14,10 +14,6 @@ const MIME_TYPE_TO_EXTENSION: Record<string, string> = {
 };
 const SIZE_PATTERN = /^\d+x\d+$/;
 const ASPECT_RATIO_PATTERN = /^\d+:\d+$/;
-
-function getFileExtension(mediaType: string): string {
-  return MIME_TYPE_TO_EXTENSION[mediaType] ?? 'png';
-}
 
 export const generateImageTool = ({
   context,
@@ -71,10 +67,8 @@ export const generateImageTool = ({
         path: ['size'],
       }),
     execute: async ({ prompt, status, n, size, aspectRatio, seed }) => {
-      const channelId = context.event.channel;
-      const messageTs = context.event.ts;
-      const threadTs =
-        (context.event as { thread_ts?: string }).thread_ts ?? messageTs;
+      const { channel: channelId, ts: messageTs, thread_ts } = context.event;
+      const threadTs = thread_ts ?? messageTs;
       let statusMessageTs: string | undefined;
 
       if (!(channelId && threadTs)) {
@@ -127,7 +121,7 @@ export const generateImageTool = ({
         });
 
         for (const [index, image] of result.images.entries()) {
-          const extension = getFileExtension(image.mediaType);
+          const extension = EXTENSION[image.mediaType] ?? 'png';
           await context.client.files.uploadV2({
             channel_id: channelId,
             thread_ts: threadTs,

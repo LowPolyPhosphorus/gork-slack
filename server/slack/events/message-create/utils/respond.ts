@@ -13,7 +13,6 @@ import { reply } from '~/lib/ai/tools/reply';
 import { report } from '~/lib/ai/tools/report';
 import { searchMemories } from '~/lib/ai/tools/search-memories';
 import { skip } from '~/lib/ai/tools/skip';
-import { stopTalking } from '~/lib/ai/tools/stop-talking';
 import { successToolCall } from '~/lib/ai/utils';
 import type {
   PineconeMetadataOutput,
@@ -30,8 +29,7 @@ export async function generateResponse(
   memories: ScoredPineconeRecord<PineconeMetadataOutput>[]
 ) {
   try {
-    const userId = (context.event as { user?: string }).user;
-    const messageText = (context.event as { text?: string }).text ?? '';
+    const { user: userId, text: messageText = '' } = context.event;
     const files = (context.event as { files?: SlackFile[] }).files;
     const authorName = userId
       ? await getSlackUserName(context.client, userId)
@@ -48,22 +46,8 @@ export async function generateResponse(
       },
     });
 
-    // Process images from the current message
-    const imageContents = await processSlackFiles(files);
-
-    // Build the current message content
-    let currentMessageContent: UserContent;
+    const images = await processSlackFiles(files);
     const replyPrompt = `You are replying to the following message from ${authorName} (${userId}): ${messageText}`;
-
-    if (imageContents.length > 0) {
-      // Include images with the reply prompt
-      currentMessageContent = [
-        { type: 'text' as const, text: replyPrompt },
-        ...imageContents,
-      ];
-    } else {
-      currentMessageContent = replyPrompt;
-    }
 
     const { toolCalls } = await generateText({
       model: provider.languageModel('chat-model'),
@@ -71,7 +55,9 @@ export async function generateResponse(
         ...messages,
         {
           role: 'user',
-          content: currentMessageContent,
+          content: (images.length
+            ? [{ type: 'text', text: replyPrompt }, ...images]
+            : replyPrompt) as UserContent,
         },
       ],
       providerOptions: {
@@ -100,7 +86,6 @@ export async function generateResponse(
         reply: reply({ context }),
         report: report({ context }),
         skip: skip({ context }),
-        stopTalking: stopTalking({ context }),
       },
       system,
       stopWhen: [
